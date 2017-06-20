@@ -47,23 +47,17 @@ def generate_continuous_plot(datapts, bins = 250, cdf = False, normed = True, rg
      return rplot
 ##
 
-def compute_nthline_points(n, ulam_set, v0, v1): ## TODO: Check this function for correctness 
-     
+def compute_nthline_points(nsteps, ulam_set, v0, v1): ## TODO: Check this function for correctness 
      v0, v1 = map(vector, [v0, v1])
-     if n == 1: 
+     if nsteps == 1: 
           return map(tuple, [v0 + v1])
-     elif n % 2 == 0: # n even: only the boundary vectors here
-          return map(tuple, [n * v0 + v1, v0 + n * v1])
+     elif nsteps % 2 == 0: # n even: only the boundary vectors here
+          return map(tuple, [nsteps * v0 + v1, v0 + nsteps * v1])
      else: # n odd: return all m v0 + n v1 for m,n >= 3 (both odd)
-          oddindexed_vecs = [m * v0 + n * v1 for m in range(3, n+2) for n in range(3, n+2) \
-                             if m % 2 == 1 and n % 2 == 1]
-          return map(tuple, oddindexed_vecs + [n * v0 + v1, v0 + n * v1])
+          oddindexed_vecs = [m * v0 + n * v1 for m in range(3, nsteps + 2) for n in range(3, nsteps + 2) \
+                             if m % 2 == 1 and n % 2 == 1 and m + n == nsteps + 3]
+          return map(tuple, oddindexed_vecs + [nsteps * v0 + v1, v0 + nsteps * v1])
      ##
-     
-     #else: 
-     #     numpts = (n + 2.0) / 2.0
-     #     segment_line = lambda x: slope_func(sv0, sv1) * (x - X(sv0)) + Y(sv0)
-     #     return [segment_line(x) for x in range(0, numpts)]
 ##
 
 def compute_nthline_full(n, ulam_set, v0, v1): 
@@ -138,6 +132,7 @@ if __name__ == '__main__':
           plotn = generate_continuous_plot(getnthline_stats, llabel = sdesc, 
                                                      rgb = point_colors[sidx])
           total_plot += plotn
+          total_plot.show()
      ##
      
      plot_title_vlst = map(lambda (x, y): r'$[^{% 3g}_{% 3g}]$' % (x, y), [v0, v1, ulam_set[2][1]])
