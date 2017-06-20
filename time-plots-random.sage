@@ -2,10 +2,12 @@ from sys import argv
 from oset import oset ## Source distribution: https://pypi.python.org/pypi/oset/
 from random import uniform, seed
 from datetime import datetime
+import time
 from sage.all import *
 from sage.plot.colors import rainbow
 from ulam_sets_modified import compute_ulam_set
 from Means import MeanStats
+import numpy as np
 
 X = lambda v: v[0]
 Y = lambda v: v[1]
@@ -33,49 +35,65 @@ def generate_random_vectors(vector_1d = False, intmin = 0, intmax = 1, numvecs =
      return init_vectors
 ## 
 
-def generate_continuous_histogram_plot(datapts, bins = 250, cdf = False, normed = True, rgb = 'blue'): 
-     histpts, bin_edges = np.histogram(datapts, bins = bins, density = normed, 
-                                       cumulative = cdf, label = None)
-     bincenters = np.diff(bin_edges)
-     plotpts = zip(list(bincenters), list(histpts))
-     rplot = list_plot(plotpts, plotjoined = True, rgbcolor = rgb, legend_label = label, 
-                       fill = axis, fillcolor = rgb, fillalpha = 0.5, thickness = 2)
+def generate_continuous_histogram_plot(datapts, bins = 250, cdf = False, normed = True, rgb = 'blue', 
+                                       llabel = ""): 
+     print "datapts: ", datapts
+     #histpts, bin_edges = np.histogram(datapts, bins = bins, density = normed)
+     #if cdf: 
+     #     cdfpts = []
+     #     for i in range(0, len(histpts)): 
+     #          cdfpts += [sum(histpts[0:i+1])]
+     #     ##
+     #     histpts = cdfpts
+     ###
+     #bincenters = np.diff(bin_edges)
+     plotpts = zip(range(1, len(datapts) + 1), datapts)
+     print llabel
+     rplot = list_plot(plotpts, plotjoined = True, rgbcolor = rgb, legend_label = llabel, thickness = 2)
      rplot.set_legend_options(title = "Statistics for Times", fancybox = True, 
-                              font_size = 'large', ncol = 2, back_color = '#c2c2c2')
+                              font_size = 'xx-small', ncol = 2, back_color = '#c2c2c2')
      return rplot
 ##
 
-def compute_nthline_points(n, ulam_set, v0, v1, v2): ## TODO: Check this function for correctness 
-     print "v0, v1, v2: ", v0, v1, v2
-     slope_func = lambda (x0, y0), (x1, y1): float((y1-y0) / (x1-x0))
-     upper_line = lambda x: x if v0[0]-v2[0] == 0 else slope_func(v0, v2) * (x - X(v0)) + Y(v0)
-     lower_line = lambda x: v1[1] if v1[0]-v2[0] == 0 or v1[1]-v2[1] == 0 \
-                                  else slope_func(v1, v2) * (x - X(v1)) + Y(v1)
-     upperhyp, lowerhyp = n * edist(v0, v2), n * edist(v1, v2)
-     upper_linex = lambda x: 0 if v0[0]-v2[0] == 0 else float(sqrt(upperhyp**2 - upper_line(x)**2) + X(v2))
-     lower_linex = lambda x: x if v1[1]-v2[1] == 0 else float(sqrt(lowerhyp**2 - lower_line(x)**2) + X(v2))
+def compute_nthline_points(n, ulam_set, v0, v1): ## TODO: Check this function for correctness 
+     #print "n, v0, v1, v2: ", n, v0, v1, v2
+     #n = n - 1
+     #slope_func = lambda (x0, y0), (x1, y1): float((y1-y0) / (x1-x0))
+     #upper_line = lambda x: x if v0[0]-v2[0] == 0 else slope_func(v0, v2) * (x - X(v0)) + Y(v0)
+     #lower_line = lambda x: v1[1] if v1[0]-v2[0] == 0 or v1[1]-v2[1] == 0 \
+     #                             else slope_func(v1, v2) * (x - X(v1)) + Y(v1)
+     #upperhyp, lowerhyp = (n + 1) * edist(v0, (0, 0)), (n + 1) * edist(v1, (0, 0))
+     #upper_linex = lambda x: 0 if v0[0]-v2[0] == 0 else float(sqrt(upperhyp**2 - upper_line(x)**2) + X(v2))
+     #lower_linex = lambda x: x if v1[1]-v2[1] == 0 else float(sqrt(lowerhyp**2 - lower_line(x)**2) + X(v2))
      
      #print eval_on_operands(upper_line)(z)
      #var('z')
      #print lower_line(z), upper_line(z)
      
-     upper_line_vec = lambda n: (upper_linex(n), upper_line(n))
-     lower_line_vec = lambda n: (lower_linex(n), lower_line(n))
-     sv0, sv1 = upper_line_vec(n), lower_line_vec(n)
+     #upper_line_vec = lambda n: (upper_linex(n), upper_line(n))
+     #lower_line_vec = lambda n: (lower_linex(n), lower_line(n))
+     #sv0, sv1 = upper_line_vec(n), lower_line_vec(n)
      
-     if n == 0: 
-          return [v2]
-     elif n % 2 == 1: # n odd: only the boundary vectors here
-          return [sv0, sv1]
-     else: 
-          numpts = (n + 2.0) / 2.0
-          segment_line = lambda x: slope_func(sv0, sv1) * (x - X(sv0)) + Y(sv0)
-          return [segment_line(x) for x in range(0, numpts)]
+     v0, v1 = map(vector, [v0, v1])
+     if n == 1: 
+          return map(tuple, [v0 + v1])
+     elif n % 2 == 0: # n even: only the boundary vectors here
+          return map(tuple, [n * v0 + v1, v0 + n * v1])
+     else: # n odd: return all m v0 + n v1 for m,n >= 3 (both odd)
+          oddindexed_vecs = [m * v0 + n * v1 for m in range(3, n+2) for n in range(3, n+2) \
+                             if m % 2 == 1 and n % 2 == 1]
+          return map(tuple, oddindexed_vecs + [n * v0 + v1, v0 + n * v1])
      ##
+     
+     #else: 
+     #     numpts = (n + 2.0) / 2.0
+     #     segment_line = lambda x: slope_func(sv0, sv1) * (x - X(sv0)) + Y(sv0)
+     #     return [segment_line(x) for x in range(0, numpts)]
 ##
 
-def compute_nthline_full(n, ulam_set, v0, v1, v2): 
-     searchpts = compute_nthline_points(n, ulam_set, v0, v1, v2)
+def compute_nthline_full(n, ulam_set, v0, v1): 
+     searchpts = compute_nthline_points(n, ulam_set, v0, v1)
+     print "ulam_set: ", ulam_set
      print "n, searchpts: ", n, searchpts
      nthline_full = True
      for sp in searchpts: 
@@ -89,19 +107,20 @@ def compute_nthline_full(n, ulam_set, v0, v1, v2):
      return nthline_full
 ##
 
-def compute_nthline_times(ulam_set, v0, v1, v2): 
+def compute_nthline_times(ulam_set, v0, v1): 
      nsteps, timeslst = 1, []
      while True: 
-          if not compute_nthline_full(nsteps, ulam_set, v0, v1, v2): 
+          if not compute_nthline_full(nsteps, ulam_set, v0, v1): 
                break
           ##
-          searchpts = compute_nthline_points(nsteps, ulam_set, v0, v1, v2)
+          searchpts = compute_nthline_points(nsteps, ulam_set, v0, v1)
           nthline_indices = []
           for sp in searchpts: 
                (ntime, vec) = filter(lambda (nidx, vec): vec == sp, ulam_set)[0]
                nthline_indices += [ntime]
           ##
-          timeslst += nthline_indices
+          timeslst += [nthline_indices]
+          nsteps += 1
      ##
      return timeslst
 ## 
@@ -135,25 +154,27 @@ if __name__ == '__main__':
      ##
      
      v0, v1 = init_vectors
-     wedge_angle = abs(math.atan2(Y(v0), X(v0)) - math.atan2(Y(v1), X(v1)))
+     wedge_angle = float(abs(math.atan2(Y(v0), X(v0)) - math.atan2(Y(v1), X(v1))))
      ulam_set = compute_ulam_set(nsteps, init_vectors = [v0, v1], return_indices = True)
      #sys.exit(0)
-     nthline_times = compute_nthline_times(ulam_set, v0, v1, v2 = ulam_set[2][1])
-     nthline_stats = map(lambda nthlst: MeanStats.compute_all_statistics(nthlst), nthline_times)
+     nthline_times = compute_nthline_times(ulam_set, v0, v1)
      print "nthline_times: ", nthline_times
-     print "nthline_stats: ", nthline_stats
+     nthline_stats = map(lambda nthlst: MeanStats.compute_all_statistics(nthlst), nthline_times)
+     print "nthline_stats: ", nthline_stats, nthline_stats[0]
      statdesc = map(lambda (sdesc, stat): sdesc, nthline_stats[0])
      point_colors = rainbow(len(statdesc))
      total_plot = Graphics()
      for (sidx, sdesc) in enumerate(statdesc): 
-          getnthline_stats = nthline_stats[:][sidx]
-          plotn = generate_continuous_histogram_plot(getnthline_stats, label = sdesc, rgb = point_colors[sidx])
+          getnthline_stats = [nthline_stat[sidx][1] / wedge_angle for nthline_stat in nthline_stats] 
+          getnthline_stats = filter(lambda stat: stat != np.nan, getnthline_stats)
+          plotn = generate_continuous_histogram_plot(getnthline_stats, llabel = sdesc, 
+                                                     rgb = point_colors[sidx])
           total_plot += plotn
      ##
      
-     plot_title_vlst = map(lambda (x, y): r'$[^{% 3g}_{% 3g}]$' % (x, y), [v1, v2])
+     plot_title_vlst = map(lambda (x, y): r'$[^{% 3g}_{% 3g}]$' % (x, y), [v0, v1, ulam_set[2][1]])
      total_plot_title = "ULAM SET $\\equiv$ \{" + ', '.join(plot_title_vlst) + ", \ldots\}"
-     image_path = "random-ulam-set-" + str(datetime.now())
+     image_path = "random-ulam-set-N%05d" % nsteps + time.strftime("%Y-%m-%d-%H%M%S", time.gmtime()) + ".png"
      total_plot.save(image_path, title = total_plot_title, frame = True, 
                      typeset = 'latex', axes_labels = ("N", "pdf/cdf(N)"))
      total_plot.show(title = total_plot_title, frame = True, 
