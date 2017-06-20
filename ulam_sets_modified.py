@@ -1,12 +1,13 @@
 ## Based on code written by Kevin Lui and Maxie D. Schmidt
 
 from sys import argv
-from oset import oset ## Source distribution: https://pypi.python.org/pypi/oset/
 from copy import copy, deepcopy
 import numpy as np
+from OrderedSetLocal import OrderedSetLocal as oset
 
 def infinity_norm(v):
     return max(abs(v[0]), abs(v[1]))
+    #return min(abs(v[0]), abs(v[1]))
 
 
 def two_norm_squared(v):
@@ -22,97 +23,121 @@ def vector_sum(v, w):
          raise ValueError("Only 1D and 2D vectors supported.")
 ##
 
-def compute_ulam_set(n, init_vectors=[(1, 0), (0, 1)], norm=infinity_norm, return_indices = False):
+def compute_ulam_set_fast(n, init_vectors=[(1, 0), (0, 1)], norm=two_norm_squared):
     # ulam_set is the set of all ulam elements found so far
-    ulam_set = oset(init_vectors)
-    old_ulam_set = oset(ulam_set)
+    ulam_set = set(init_vectors)
+    old_ulam_set = ulam_set.copy()
 
     # new_ulam is the set of all ulam elements found in the latest iteration
-    new_ulam = oset(init_vectors)
+    new_ulam = set(init_vectors)
 
     # pairwise sums is the set of all pairwise sums of all ulam elements found
     # so far that are not already in ulam_set
-    pairwise_sums = oset([])
-    set2index_dict = dict()
-    for idx in range(0, len(init_vectors)): 
-         set2index_dict[idx] = 0
-    ##
+    pairwise_sums = set([])
     unique_counts = dict()
     for ic in init_vectors: 
          unique_counts[ic] = 1
     ##
 
-    for nidx in range(1, n):
+    for nidx in range(1, n + 1):
         # update pairwise sums by computing pairwise sums between new_ulam
         # elements and ulam_set elements and substracting ulam_set
         print nidx
-        #print "ulam_set: ", ulam_set
-        #old_ulam_set2 = [old_ulam_set[i] for i in range(0, len(old_ulam_set))]
-        #new_ulam2 = [new_ulam[i] for i in range(0, len(new_ulam))]
-        new_sums = []
-        new_ulam = [(i, new_ulam[i]) for i in range(0, len(new_ulam))]
-        if nidx == 0: # TODO: This only handles the case of two initial vectors
-             new_sums = [vector_sum(init_vectors[0], init_vectors[1])]
-        else: 
-             for i in range(0, len(new_ulam)): 
-                 (xidx, x) = new_ulam[i]
-                 for yidx in range(0, len(ulam_set)): 
-                     y = ulam_set[yidx]
-                     if x == y: continue
-                     new_sums += [vector_sum(x, y)]
-                 ##
-            ##
+        new_ulam = list(new_ulam)
+        new_sums = [vector_sum(x, y) for x in list(old_ulam_set) for y in new_ulam
+                    if x != y]
+        for (xidx, x) in enumerate(new_ulam): 
+             for yidx in range(xidx + 1, len(new_ulam)): 
+                  y = new_ulam[yidx]
+                  new_sums += [vector_sum(x, y)]
+             ##
         ##
-        new_ulam = []
-        new_sums = list(oset(new_sums))
         for nsum in new_sums: 
-             if nsum in unique_counts:
+             if nsum in unique_counts and nidx > 1:
                   unique_counts[nsum] += 1
              else: 
                   unique_counts[nsum] = 1
         ##
-        #print "pws: ", pairwise_sums
-        pairwise_sums = pairwise_sums | oset(new_sums)
-        #print "pws: ", pairwise_sums
-        #print "ulam_set: ", ulam_set
-        pairwise_sums = (pairwise_sums | ulam_set) - ulam_set
-        #print "pws: ", pairwise_sums
-        #print "ulam_set: ", ulam_set
+        pairwise_sums = pairwise_sums.union(set(new_sums))
+        pairwise_sums = pairwise_sums.difference(ulam_set)
 
         # remove elements that are not uniquely represented: 
-        #print "new_sums: ", new_sums
-        #print nidx, pairwise_sums
-        #print "ulam_set: ", ulam_set
-        #pairwise_sums_temp = deepcopy(pairwise_sums)
-        #for i in range(0, len(pairwise_sums)): 
-        #     v = pairwise_sums[i]
-        #     if unique_counts[v] > 1: 
-        #          pairwise_sums_temp.discard(v)
-        #     else: 
-        #          new_ulam += [v]
-        #     ##
-        ###
-        #pairwise_sums = deepcopy(pairwise_sums_temp)
-
+        pairwise_sums_temp = pairwise_sums.copy()
+        for v in pairwise_sums: 
+             if unique_counts[v] > 1: 
+                  pairwise_sums_temp.remove(v)
+        ##
+        pairwise_sums = pairwise_sums_temp.copy()
 
         # update new_ulam to be the set of pairwise sums of smallest norm
-        smallest_norm = min([norm(pairwise_sums[xidx]) for xidx in range(0, len(pairwise_sums))])
-        new_ulam = oset([pairwise_sums[i] for i in range(0, len(pairwise_sums)) \
-                         if norm(pairwise_sums[i]) == smallest_norm])
-                
-        # handle the possibility of multiple vectors added at this nidx for time calculations:
-        curidx = len(set2index_dict)
-        for idx in range(0, len(new_ulam)): 
-             set2index_dict[curidx + idx] = nidx
-        ##
+        smallest_norm = min([norm(x) for x in list(pairwise_sums)])
+        new_ulam = set([x for x in list(pairwise_sums) if norm(x) == smallest_norm])
         
         # update ulam_set to include new_ulam
-        #print "ulam_set: ", ulam_set
-        old_ulam_set = oset(ulam_set)
-        ulam_set = oset(old_ulam_set | new_ulam)
-        #print "ulam_set: ", ulam_set
-    if return_indices: 
-         return [(set2index_dict[idx], ulam_set[idx]) for idx in range(0, len(ulam_set))]
-    else: 
-         return [ulam_set[idx] for idx in range(0, len(ulam_set))]
+        old_ulam_set = ulam_set.copy()
+        ulam_set = ulam_set.union(new_ulam)
+
+    return ulam_set
+    
+def compute_ulam_set(n, init_vectors=[(1, 0), (0, 1)], norm=two_norm_squared, return_indices = False):
+    
+    if not return_indices: # Use the fastest implementation if we don't need to keep track of times: 
+         return compute_ulam_set_fast(n, init_vectors = init_vectors, norm = norm)
+    ##
+    
+    # ulam_set is the set of all ulam elements found so far
+    ulam_set = oset(init_vectors, ntime = 0)
+    old_ulam_set = ulam_set.copy()
+
+    # new_ulam is the set of all ulam elements found in the latest iteration
+    new_ulam = oset(init_vectors, ntime = 0)
+
+    # pairwise sums is the set of all pairwise sums of all ulam elements found
+    # so far that are not already in ulam_set
+    pairwise_sums = set([])
+    unique_counts = dict()
+    for ic in init_vectors: 
+         unique_counts[ic] = 1
+    ##
+
+    for nidx in range(1, n + 1):
+        # update pairwise sums by computing pairwise sums between new_ulam
+        # elements and ulam_set elements and substracting ulam_set
+        print nidx
+        new_ulam = new_ulam.list()
+        new_sums = [vector_sum(x, y) for x in old_ulam_set.list() for y in new_ulam
+                    if x != y]
+        for (xidx, x) in enumerate(new_ulam): 
+             for yidx in range(xidx + 1, len(new_ulam)): 
+                  y = new_ulam[yidx]
+                  new_sums += [vector_sum(x, y)]
+             ##
+        ##
+        for nsum in new_sums: 
+             if nsum in unique_counts and nidx > 1:
+                  unique_counts[nsum] += 1
+             else: 
+                  unique_counts[nsum] = 1
+        ##
+        pairwise_sums = pairwise_sums.union(set(new_sums))
+        pairwise_sums = pairwise_sums.difference(set(ulam_set.list()))
+
+        # remove elements that are not uniquely represented: 
+        pairwise_sums_temp = pairwise_sums.copy()
+        for v in pairwise_sums: 
+             if unique_counts[v] > 1: 
+                  pairwise_sums_temp.remove(v)
+        ##
+        pairwise_sums = pairwise_sums_temp.copy()
+
+        # update new_ulam to be the set of pairwise sums of smallest norm
+        smallest_norm = min([norm(x) for x in list(pairwise_sums)])
+        new_ulam = oset([x for x in list(pairwise_sums) if norm(x) == smallest_norm], ntime = nidx)
+        
+        # update ulam_set to include new_ulam
+        old_ulam_set = ulam_set.copy()
+        ulam_set = ulam_set.union(new_ulam)
+
+    return ulam_set.get_indexed_list()
+
 
