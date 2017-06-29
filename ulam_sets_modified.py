@@ -5,6 +5,8 @@ from copy import copy, deepcopy
 import numpy as np
 from OrderedSetLocal import OrderedSetLocal as oset
 
+round2 = lambda input: round(input, 8)
+
 def infinity_norm(v):
     return max(abs(v[0]), abs(v[1]))
     #return min(abs(v[0]), abs(v[1]))
@@ -16,15 +18,19 @@ def two_norm_squared(v):
 
 def vector_sum(v, w): 
     if not isinstance(v, tuple): # handle the 1D case
-         return v[0] + w[0]
+         return round2(v[0] + w[0])
     elif len(v) == 2 and len(w) == 2: 
-         return (v[0]+w[0], v[1]+w[1])
+         return (round2(v[0]+w[0]), round2(v[1]+w[1]))
     else: 
          raise ValueError("Only 1D and 2D vectors supported.")
 ##
 
 def compute_ulam_set_fast(n, init_vectors=[(1, 0), (0, 1)], norm=two_norm_squared):
     # ulam_set is the set of all ulam elements found so far
+    for (idx, ic) in enumerate(init_vectors): 
+         (x, y) = ic
+         init_vectors[idx] = (round2(x), round2(y))
+    ##
     ulam_set = set(init_vectors)
     old_ulam_set = ulam_set.copy()
 
@@ -86,6 +92,11 @@ def compute_ulam_set(n, init_vectors=[(1, 0), (0, 1)], norm=two_norm_squared, re
     ##
     
     # ulam_set is the set of all ulam elements found so far
+    for (idx, ic) in enumerate(init_vectors): 
+         (x, y) = ic
+         init_vectors[idx] = (round2(x), round2(y))
+    ##
+    print "init_vectors: ", init_vectors
     ulam_set = oset(init_vectors, ntime = 0)
     old_ulam_set = ulam_set.copy()
 
